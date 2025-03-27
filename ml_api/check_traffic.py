@@ -18,13 +18,12 @@ with open(abi_path, "r") as abi_file:
     abi_data = json.load(abi_file)
 
 # Extract ABI list
-if "abi" in abi_data:
-    contract_abi = abi_data["abi"]
-else:
+contract_abi = abi_data.get("abi")
+if contract_abi is None:
     raise ValueError("Invalid ABI file format: Missing 'abi' key")
 
 # Smart Contract Details
-contract_address = "0x5FbDB2315678afecb367f032d93F642f64180aa3"  # Replace with actual deployed contract address
+contract_address = "0x5FbDB2315678afecb367f032d93F642f64180aa3"  # Update with actual deployed contract address
 contract = w3.eth.contract(address=contract_address, abi=contract_abi)
 
 # Sample Network Traffic Data
@@ -43,14 +42,17 @@ ddos_sample = {
                   0, 0, 27000000, 0, 27000000, 27000000]]
 }
 
-# Function to check traffic
-def check_traffic(sample_data, sample_type):
-    print(f"\n🔍 Checking {sample_type} traffic...")
+# Function to check traffic with Chi-Square or RL method
+def check_traffic(sample_data, sample_type, method):
+    print(f"\n🔍 Checking {sample_type} traffic using {method.upper()} method...")
+
+    # Add the method type (chi or rl)
+    sample_data["method"] = method
 
     # Send data to ML API for prediction
     try:
         response = requests.post("http://127.0.0.1:5000/predict", json=sample_data)
-        response.raise_for_status()  # Raise an error for bad responses
+        response.raise_for_status()
         result = response.json()
     except requests.exceptions.RequestException as e:
         print(f"❌ Error contacting ML API: {e}")
@@ -62,17 +64,18 @@ def check_traffic(sample_data, sample_type):
 
     if is_malicious:
         attacker_ip = "192.168.1.100"  # Replace with actual attacker's IP
-        print(f"⚠️ DDoS detected from {attacker_ip}, logging to blockchain...")
+        print(f"⚠️ DDoS detected from  logging to blockchain...")
 
-        # Send transaction to blockchain
+        # Log attack to blockchain with method type
         try:
-            tx = contract.functions.reportAttack(attacker_ip).transact({'from': w3.eth.accounts[0]})
-            print(f"✅ Attack logged on blockchain: {tx.hex()}")
+            tx = contract.functions.reportAttack(attacker_ip, method).transact({'from': w3.eth.accounts[0]})
+            print(f"✅ Attack logged on blockchain using {method.upper()} method: {tx.hex()}")
         except Exception as e:
             print(f"❌ Blockchain transaction failed: {e}")
     else:
-        print(f"✅ No malicious activity detected for {sample_type} traffic.")
+        print(f"✅ No malicious activity detected for {sample_type} traffic using {method.upper()} method.")
 
-# Run tests
-check_traffic(benign_sample, "benign_sample")
-check_traffic(ddos_sample, "ddos_sample")
+# Run tests with both methods
+for method in ["chi", "rl"]:
+    check_traffic(benign_sample.copy(), "benign_sample", method)
+    check_traffic(ddos_sample.copy(), "ddos_sample", method)
